@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -304,5 +305,26 @@ func TestRTKChannelVersion(t *testing.T) {
 		if got != c.want || (err == nil) != (c.want != "") {
 			t.Errorf("%s %q: %q, %v", c.tool, c.out, got, err)
 		}
+	}
+}
+
+// TestRTKCargoUpgraderNamesPackage (#2092): rtk's repo has held two binary
+// packages, rtk and rtk-proxy, since 1.0, so a bare cargo install --git
+// refuses with "multiple packages with binaries found". The upgrade names
+// the rtk package, as rtk's own Cargo.toml documents.
+func TestRTKCargoUpgraderNamesPackage(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake cargo is a shell script")
+	}
+	h := sandbox(t)
+	tools := filepath.Join(h, "tools")
+	testenv.Program(t, filepath.Join(tools, "cargo"), "#!/bin/sh\n")
+	t.Setenv("PATH", tools)
+	c := rtkUpgrader(filepath.Join(h, ".cargo", "bin", "rtk"))
+	if len(c) == 0 || c[0] != "cargo" {
+		t.Fatalf("rtk in ~/.cargo/bin upgrades with %v; want cargo", c)
+	}
+	if !slices.Contains(c, "rtk") {
+		t.Fatalf("cargo upgrade %v; want the rtk package named — cargo finds rtk and rtk-proxy and refuses without it", c)
 	}
 }
